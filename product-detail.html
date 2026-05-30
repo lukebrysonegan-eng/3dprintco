@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product – 3D Print Co.</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="tracker.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>3D Print Co.</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Products</a>
+      <a href="index.html#quote">Get a Quote</a>
+      <a href="index.html#contact">Contact</a>
+    </nav>
+  </header>
+
+  <section id="detail-page">
+    <a href="products.html" class="back-link">← Back to Products</a>
+    <div id="detail-content">Loading...</div>
+  </section>
+
+  <!-- Stock edit popup (admin only) -->
+  <div id="stock-modal" style="display:none;">
+    <div class="modal-box">
+      <h3>Set Stock — <span id="stock-color-name"></span></h3>
+      <label>How many in stock?</label>
+      <input type="number" id="stock-input" min="0" placeholder="e.g. 10" style="width:100%;" />
+      <div style="display:flex; gap:0.75rem; margin-top:0.75rem;">
+        <button class="btn" onclick="saveStock()">Save</button>
+        <button class="btn-outline" onclick="closeStockModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; 2026 3D Print Co. All rights reserved.</p>
+  </footer>
+
+  <script>
+    const COLORS = [
+      { name: 'Red',          hex: '#e74c3c', extra: 0 },
+      { name: 'Blue',         hex: '#3498db', extra: 0 },
+      { name: 'Green',        hex: '#2ecc71', extra: 0 },
+      { name: 'Black',        hex: '#1a1a1a', extra: 0 },
+      { name: 'White',        hex: '#f0f0f0', extra: 0, border: true },
+      { name: 'Yellow',       hex: '#f1c40f', extra: 0 },
+      { name: 'Orange',       hex: '#e67e22', extra: 0 },
+      { name: 'Purple',       hex: '#9b59b6', extra: 0 },
+      { name: 'Glow in Dark', hex: '#39ff14', extra: 2, glow: true },
+    ];
+
+    const isAdmin = sessionStorage.getItem('adminLoggedIn') === 'true';
+    // Update cart count on load
+    (function() {
+      const c = JSON.parse(localStorage.getItem('cart') || '[]').reduce((s,i)=>s+i.qty,0);
+      document.querySelectorAll('.cart-count').forEach(el => el.textContent = c);
+    })();
+    let selectedColor = null;
+    let basePrice = 0;
+    let product;
+    let editingColorIndex = null;
+    let qty = 1;
+
+    function stockKey(productName, colorName) {
+      return 'stock__' + productName + '__' + colorName;
+    }
+
+    function getStock(colorName) {
+      const val = localStorage.getItem(stockKey(product.name, colorName));
+      return val === null ? null : parseInt(val);
+    }
+
+    window.onload = function () {
+      const params = new URLSearchParams(window.location.search);
+      const name   = decodeURIComponent(params.get('name') || '');
+      const saved  = JSON.parse(localStorage.getItem('products') || '[]');
+      product = saved.find(p => p.name === name);
+
+      const content = document.getElementById('detail-content');
+      if (!product) { content.innerHTML = '<p>Product not found.</p>'; return; }
+
+      document.title = product.name + ' – 3D Print Co.';
+      basePrice = parseFloat((product.price || '0').replace(/[^0-9.]/g, '')) || 0;
+
+      content.innerHTML = `
+        <div class="detail-card">
+          <div class="detail-emoji">${product.emoji}</div>
+          <div class="detail-info">
+            <h2>${product.name}</h2>
+            <div id="price-display" class="price" style="font-size:1.1rem;">${product.price || ''}</div>
+            <div class="detail-section">
+              <h4>Description</h4>
+              <p>${product.desc || 'No description provided.'}</p>
+            </div>
+            ${product.features && product.features.length ? `
+            <div class="detail-section">
+              <h4>Features</h4>
+              <ul class="feature-list">
+                ${product.features.map(f => `<li>✔ ${f}</li>`).join('')}
+              </ul>
+            </div>` : ''}
+            <div class="detail-section">
+              <h4>Color — <span id="color-label" style="color:#1a1a2e; font-weight:600;">Select a color</span></h4>
+              ${isAdmin ? '<p style="font-size:0.8rem; color:#999; margin-bottom:0.5rem;">Admin: click a color to select it, or click the stock number to edit it.</p>' : ''}
+              <div class="color-swatches" id="color-swatches"></div>
+              <p id="glow-note" style="display:none; color:#27ae60; font-size:0.85rem; margin-top:0.5rem;">✨ Glow in the Dark adds +$2.00</p>
+            </div>
+            <div class="detail-section" id="qty-section" style="display:none;">
+              <h4>Quantity</h4>
+              <div class="qty-control">
+                <button onclick="changeQty(-1)">−</button>
+                <span id="qty-display">1</span>
+                <button onclick="changeQty(1)">+</button>
+              </div>
+              <p id="qty-max-note" style="font-size:0.8rem; color:#999; margin-top:0.4rem;"></p>
+            </div>
+            <div id="total-price" style="display:none; font-size:1.1rem; font-weight:bold; color:#1a1a2e; margin-top:0.5rem;"></div>
+            <button id="buy-btn" onclick="addToCart()" class="btn" style="margin-top:1.5rem; opacity:0.4; pointer-events:none;">🛒 Add to Cart</button>
+          </div>
+        </div>
+      `;
+
+      renderSwatches();
+    };
+
+    function renderSwatches() {
+      const container = document.getElementById('color-swatches');
+      container.innerHTML = '';
+
+      COLORS.forEach((c, i) => {
+        const stock    = getStock(c.name);
+        const noStock  = stock !== null && stock <= 0;
+        const isSelected = selectedColor && selectedColor.name === c.name;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'swatch-wrap';
+
+        // Swatch button
+        const btn = document.createElement('button');
+        btn.className = 'color-swatch' + (isSelected ? ' selected' : '') + (noStock ? ' out-of-stock' : '');
+        btn.style.background = c.hex;
+        if (c.border) btn.style.border = '2px solid #ccc';
+        if (c.glow)   btn.style.boxShadow = '0 0 8px #39ff14';
+        btn.title = c.name + (c.extra ? ' (+$' + c.extra + ')' : '') + (noStock ? ' — Out of Stock' : '');
+
+        if (noStock) {
+          btn.innerHTML = '<span class="swatch-x">✕</span>';
+          btn.disabled = true;
+        } else {
+          btn.onclick = () => selectColor(i);
+        }
+
+        wrap.appendChild(btn);
+
+        // Stock label
+        const stockLabel = document.createElement('div');
+        stockLabel.className = 'stock-label';
+
+        if (isAdmin) {
+          const stockVal = stock === null ? '∞' : stock;
+          stockLabel.innerHTML = `<span class="stock-edit" onclick="openStockModal(${i})" title="Edit stock">${stockVal}</span>`;
+        } else {
+          if (stock !== null) {
+            stockLabel.textContent = noStock ? 'Out' : stock <= 3 ? 'Only ' + stock + ' left' : '';
+            if (stock <= 3 && !noStock) stockLabel.style.color = '#e94560';
+          }
+        }
+
+        wrap.appendChild(stockLabel);
+        container.appendChild(wrap);
+      });
+    }
+
+    function selectColor(i) {
+      const stock = getStock(COLORS[i].name);
+      if (stock !== null && stock <= 0) return;
+      selectedColor = COLORS[i];
+      qty = 1;
+      document.getElementById('color-label').textContent = selectedColor.name;
+      document.getElementById('glow-note').style.display = selectedColor.glow ? 'block' : 'none';
+      document.getElementById('qty-section').style.display = 'block';
+      document.getElementById('qty-display').textContent = 1;
+      const stock2 = getStock(selectedColor.name);
+      const note = document.getElementById('qty-max-note');
+      note.textContent = stock2 !== null ? 'Max available: ' + stock2 : '';
+      renderSwatches();
+      updateBuyBtn();
+    }
+
+    function changeQty(dir) {
+      const stock = getStock(selectedColor.name);
+      const max   = stock !== null ? stock : 999;
+      qty = Math.min(Math.max(1, qty + dir), max);
+      document.getElementById('qty-display').textContent = qty;
+      updateBuyBtn();
+    }
+
+    function updateBuyBtn() {
+      const btn = document.getElementById('buy-btn');
+      if (!selectedColor) return;
+      const unitPrice  = basePrice > 0 ? basePrice + selectedColor.extra : 0;
+      const totalPrice = unitPrice > 0 ? (unitPrice * qty).toFixed(2) : null;
+
+      if (document.getElementById('price-display') && unitPrice)
+        document.getElementById('price-display').textContent = '$' + unitPrice.toFixed(2) + ' each';
+
+      const totalEl = document.getElementById('total-price');
+      if (totalPrice && qty > 1) {
+        totalEl.textContent = 'Total: $' + totalPrice;
+        totalEl.style.display = 'block';
+      } else {
+        totalEl.style.display = 'none';
+      }
+
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+    }
+
+    function addToCart() {
+      if (!selectedColor) return;
+      const unitPrice = basePrice > 0 ? basePrice + selectedColor.extra : 0;
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+      // If same product+color already in cart, increase qty
+      const existing = cart.find(i => i.name === product.name && i.color === selectedColor.name);
+      if (existing) {
+        existing.qty += qty;
+      } else {
+        cart.push({
+          name: product.name,
+          emoji: product.emoji || '📦',
+          color: selectedColor.name,
+          unitPrice: unitPrice || null,
+          qty
+        });
+      }
+      localStorage.setItem('cart', JSON.stringify(cart));
+
+      // Update cart count in nav
+      const total = cart.reduce((s, i) => s + i.qty, 0);
+      document.querySelectorAll('.cart-count').forEach(el => el.textContent = total);
+
+      // Flash confirmation
+      const btn = document.getElementById('buy-btn');
+      btn.textContent = '✔ Added!';
+      btn.style.background = '#27ae60';
+      setTimeout(() => {
+        btn.textContent = '🛒 Add to Cart';
+        btn.style.background = '';
+      }, 1500);
+    }
+
+    // Admin stock modal
+    function openStockModal(i) {
+      editingColorIndex = i;
+      const c = COLORS[i];
+      document.getElementById('stock-color-name').textContent = c.name;
+      const cur = getStock(c.name);
+      document.getElementById('stock-input').value = cur === null ? '' : cur;
+      document.getElementById('stock-modal').style.display = 'flex';
+      document.getElementById('stock-input').focus();
+    }
+
+    function closeStockModal() {
+      document.getElementById('stock-modal').style.display = 'none';
+      editingColorIndex = null;
+    }
+
+    function saveStock() {
+      const val = parseInt(document.getElementById('stock-input').value);
+      if (isNaN(val) || val < 0) { alert('Please enter a valid number.'); return; }
+      localStorage.setItem(stockKey(product.name, COLORS[editingColorIndex].name), val);
+      closeStockModal();
+      renderSwatches();
+    }
+  </script>
+
+</body>
+</html>

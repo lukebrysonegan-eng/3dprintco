@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cart – 3D Print Co.</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="tracker.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>3D Print Co.</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Our Products</a>
+      <a href="index.html#quote">Leave a Review</a>
+      <a href="index.html#contact">Contact</a>
+      <a href="cart.html" class="cart-nav-btn">🛒 Cart (<span class="cart-count">0</span>)</a>
+    </nav>
+  </header>
+
+  <section id="cart-page">
+    <h2>Your Cart</h2>
+    <div id="cart-items"></div>
+
+    <div id="cart-summary" style="display:none;">
+      <div class="cart-total-box">
+        <span>Total</span>
+        <span id="cart-total-price">$0.00</span>
+      </div>
+      <div style="display:flex; gap:1rem; margin-top:1.5rem; justify-content:flex-end;">
+        <button class="btn-outline" onclick="clearCart()">🗑 Clear Cart</button>
+        <a id="checkout-link" href="checkout.html" class="btn">Proceed to Checkout →</a>
+      </div>
+    </div>
+
+    <p id="empty-cart-msg" style="color:#aaa; text-align:center; padding:3rem 0;">Your cart is empty. <a href="products.html" style="color:#e94560;">Browse products →</a></p>
+  </section>
+
+  <footer>
+    <p>&copy; 2026 3D Print Co. All rights reserved.</p>
+  </footer>
+
+  <script>
+    function getCart() { return JSON.parse(localStorage.getItem('cart') || '[]'); }
+    function saveCart(cart) { localStorage.setItem('cart', JSON.stringify(cart)); updateCartCount(); }
+
+    function updateCartCount() {
+      const total = getCart().reduce((s, i) => s + i.qty, 0);
+      document.querySelectorAll('.cart-count').forEach(el => el.textContent = total);
+    }
+
+    function renderCart() {
+      const cart = getCart();
+      const itemsEl = document.getElementById('cart-items');
+      const summaryEl = document.getElementById('cart-summary');
+      const emptyEl = document.getElementById('empty-cart-msg');
+
+      if (cart.length === 0) {
+        itemsEl.innerHTML = '';
+        summaryEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        return;
+      }
+
+      emptyEl.style.display = 'none';
+      summaryEl.style.display = 'block';
+
+      let grandTotal = 0;
+
+      itemsEl.innerHTML = cart.map((item, i) => {
+        const lineTotal = item.unitPrice ? (item.unitPrice * item.qty).toFixed(2) : null;
+        if (lineTotal) grandTotal += parseFloat(lineTotal);
+        return `
+          <div class="cart-row">
+            <div class="cart-emoji">${item.emoji || '📦'}</div>
+            <div class="cart-info">
+              <div class="cart-item-name">${item.name}</div>
+              <div class="cart-item-meta">
+                ${item.color ? `<span>🎨 ${item.color}</span>` : ''}
+                ${item.unitPrice ? `<span>$${item.unitPrice.toFixed(2)} each</span>` : ''}
+              </div>
+            </div>
+            <div class="cart-qty-control">
+              <button onclick="changeCartQty(${i}, -1)">−</button>
+              <span>${item.qty}</span>
+              <button onclick="changeCartQty(${i}, 1)">+</button>
+            </div>
+            <div class="cart-line-total">${lineTotal ? '$' + lineTotal : '—'}</div>
+            <button class="delete-btn" onclick="removeFromCart(${i})">✕</button>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('cart-total-price').textContent = grandTotal > 0 ? '$' + grandTotal.toFixed(2) : '—';
+
+      // Build checkout link with all items as params
+      const params = new URLSearchParams();
+      params.set('from', 'cart');
+      params.set('total', grandTotal.toFixed(2));
+      document.getElementById('checkout-link').href = 'checkout.html?' + params.toString();
+    }
+
+    function changeCartQty(i, dir) {
+      const cart = getCart();
+      cart[i].qty = Math.max(1, cart[i].qty + dir);
+      saveCart(cart);
+      renderCart();
+    }
+
+    function removeFromCart(i) {
+      const cart = getCart();
+      cart.splice(i, 1);
+      saveCart(cart);
+      renderCart();
+    }
+
+    function clearCart() {
+      if (confirm('Clear your entire cart?')) {
+        saveCart([]);
+        renderCart();
+      }
+    }
+
+    updateCartCount();
+    renderCart();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout – 3D Print Co.</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="tracker.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>3D Print Co.</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Products</a>
+      <a href="index.html#contact">Contact</a>
+    <a href="cart.html" class="cart-nav-btn">🛒 Cart (<span class="cart-count">0</span>)</a>
+    </nav>
+  </header>
+
+  <section id="checkout-page">
+    <a class="back-link" id="back-btn" href="products.html">← Back</a>
+
+    <div class="checkout-wrapper">
+
+      <!-- Order Summary -->
+      <div class="order-summary">
+        <h3>Order Summary</h3>
+        <div id="order-item">
+          <p id="order-name" style="font-size:1.2rem; font-weight:bold; color:#1a1a2e;"></p>
+          <p id="order-price" style="color:#e94560; font-size:1.1rem; margin-top:0.25rem;"></p>
+        </div>
+        <hr style="margin:1rem 0; border:none; border-top:1px solid #eee;" />
+        <p style="font-size:0.85rem; color:#999;">We'll confirm your order and contact you within 24 hours.</p>
+      </div>
+
+      <!-- Customer Info Form -->
+      <div class="checkout-form-box">
+        <h2>Your Information</h2>
+        <form id="checkout-form" onsubmit="submitOrder(event)">
+
+          <div class="form-row">
+            <div>
+              <label for="first-name">First Name</label>
+              <input type="text" id="first-name" placeholder="Jane" required />
+            </div>
+            <div>
+              <label for="last-name">Last Name</label>
+              <input type="text" id="last-name" placeholder="Smith" required />
+            </div>
+          </div>
+
+          <label for="email">Email Address</label>
+          <input type="email" id="email" placeholder="jane@example.com" required />
+
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" placeholder="+1 (555) 000-0000" />
+
+          <label for="address">Shipping Address</label>
+          <input type="text" id="address" placeholder="123 Main St" required />
+
+          <div class="form-row">
+            <div>
+              <label for="city">City</label>
+              <input type="text" id="city" placeholder="New York" required />
+            </div>
+            <div>
+              <label for="zip">ZIP / Postal Code</label>
+              <input type="text" id="zip" placeholder="10001" required />
+            </div>
+          </div>
+
+          <label for="notes">Order Notes <span style="font-weight:400; color:#999; font-size:0.85rem;">(optional)</span></label>
+          <textarea id="notes" rows="3" placeholder="Any special requests or details about your order..."></textarea>
+
+          <button type="submit" class="btn" style="margin-top:0.5rem;">Place Order</button>
+        </form>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Success Message -->
+  <div id="success-overlay" style="display:none;">
+    <div class="modal-box" style="text-align:center; max-width:400px;">
+      <div style="font-size:3rem;">✅</div>
+      <h3 style="margin-top:0.5rem;">Order Received!</h3>
+      <p style="color:#555; margin-top:0.5rem;">Thanks! We'll reach out to you within 24 hours to confirm your order.</p>
+      <a href="products.html" class="btn" style="display:inline-block; margin-top:1.5rem;">Back to Products</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; 2026 3D Print Co. All rights reserved.</p>
+  </footer>
+
+  <script>
+    window.onload = function () {
+      const params   = new URLSearchParams(window.location.search);
+      const fromCart = params.get('from') === 'cart';
+      const orderEl  = document.getElementById('order-item');
+      const backBtn  = document.getElementById('back-btn');
+
+      if (fromCart) {
+        // Show all cart items in the summary
+        backBtn.href = 'cart.html';
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+        if (cart.length === 0) {
+          orderEl.innerHTML = '<p style="color:#aac4e8;">Your cart is empty.</p>';
+          return;
+        }
+
+        let grandTotal = 0;
+        orderEl.innerHTML = cart.map(item => {
+          const lineTotal = item.unitPrice ? (item.unitPrice * item.qty) : 0;
+          grandTotal += lineTotal;
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; padding-bottom:0.75rem; border-bottom:1px solid rgba(255,255,255,0.1);">
+              <div>
+                <p style="font-weight:bold; color:white; margin:0;">${item.emoji || '📦'} ${item.name}</p>
+                <p style="color:#aac4e8; font-size:0.85rem; margin:0.2rem 0 0;">
+                  ${item.color ? '🎨 ' + item.color + ' &nbsp;·&nbsp; ' : ''} Qty: ${item.qty}
+                </p>
+              </div>
+              <span style="color:#e94560; font-weight:bold; white-space:nowrap;">
+                ${item.unitPrice ? '$' + (item.unitPrice * item.qty).toFixed(2) : '—'}
+              </span>
+            </div>`;
+        }).join('');
+
+        if (grandTotal > 0) {
+          orderEl.innerHTML += `
+            <div style="display:flex; justify-content:space-between; margin-top:0.5rem; font-weight:bold; color:white; font-size:1.1rem;">
+              <span>Total</span>
+              <span>$${grandTotal.toFixed(2)}</span>
+            </div>`;
+        }
+
+      } else {
+        // Single product from detail page
+        const name  = decodeURIComponent(params.get('name')  || 'Unknown Product');
+        const price = decodeURIComponent(params.get('price') || '');
+        const color = decodeURIComponent(params.get('color') || '');
+        const qty   = parseInt(params.get('qty') || '1');
+
+        document.getElementById('order-name').textContent  = name;
+        document.getElementById('order-price').textContent = price || 'Price on request';
+
+        if (color) {
+          const colorLine = document.createElement('p');
+          colorLine.textContent = '🎨 Color: ' + color;
+          colorLine.style.cssText = 'color:#aac4e8; font-size:0.9rem; margin-top:0.4rem;';
+          orderEl.appendChild(colorLine);
+        }
+        if (qty > 1) {
+          const qtyLine = document.createElement('p');
+          qtyLine.textContent = '📦 Quantity: ' + qty;
+          qtyLine.style.cssText = 'color:#aac4e8; font-size:0.9rem; margin-top:0.2rem;';
+          orderEl.appendChild(qtyLine);
+        }
+
+        const slug = encodeURIComponent(params.get('name') || '');
+        backBtn.href = `product-detail.html?name=${slug}`;
+      }
+    };
+
+    function submitOrder(e) {
+      e.preventDefault();
+      const params    = new URLSearchParams(window.location.search);
+      const fromCart  = params.get('from') === 'cart';
+      const customer  = document.getElementById('first-name').value + ' ' + document.getElementById('last-name').value;
+      const email     = document.getElementById('email').value;
+      const date      = new Date().toLocaleDateString();
+      const orders    = JSON.parse(localStorage.getItem('orders') || '[]');
+
+      if (fromCart) {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        let grandTotal = 0;
+
+        cart.forEach(item => {
+          // Deduct stock per item
+          const key = 'stock__' + item.name + '__' + item.color;
+          const cur = localStorage.getItem(key);
+          if (cur !== null) localStorage.setItem(key, Math.max(0, parseInt(cur) - item.qty));
+          const lineTotal = item.unitPrice ? (item.unitPrice * item.qty) : 0;
+          grandTotal += lineTotal;
+          orders.unshift({ product: item.name, color: item.color, qty: item.qty, price: item.unitPrice ? '$' + lineTotal.toFixed(2) : '—', name: customer, email, date });
+        });
+
+        localStorage.setItem('orders', JSON.stringify(orders));
+        localStorage.removeItem('cart'); // clear cart after order
+      } else {
+        const product = decodeURIComponent(params.get('name')  || 'Unknown');
+        const color   = decodeURIComponent(params.get('color') || '');
+        const qty     = parseInt(params.get('qty') || '1');
+
+        if (color) {
+          const key = 'stock__' + product + '__' + color;
+          const cur = localStorage.getItem(key);
+          if (cur !== null) localStorage.setItem(key, Math.max(0, parseInt(cur) - qty));
+        }
+
+        orders.unshift({ product, price: decodeURIComponent(params.get('price') || ''), color, qty, name: customer, email, date });
+        localStorage.setItem('orders', JSON.stringify(orders));
+      }
+
+      document.getElementById('success-overlay').style.display = 'flex';
+    }
+  </script>
+
+</body>
+</html>

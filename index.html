@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Print Business</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="tracker.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>3D Print Co.</h1>
+    <nav>
+      <a href="products.html">Our Products</a>
+      <a href="#quote">Leave a Review</a>
+      <a href="#contact">Contact</a>
+    <a href="cart.html" class="cart-nav-btn">🛒 Cart (<span class="cart-count">0</span>)</a>
+    </nav>
+  </header>
+
+  <!-- Hero Slideshow -->
+  <div class="slideshow">
+    <div class="slides-track" id="slides-track"></div>
+
+    <!-- Arrows -->
+    <button class="slide-arrow left"  onclick="moveSlide(-1)">&#8592;</button>
+    <button class="slide-arrow right" onclick="moveSlide(1)">&#8594;</button>
+
+    <!-- Dots -->
+    <div class="slide-dots" id="slide-dots"></div>
+
+    <!-- Upload button (bottom right) -->
+    <button class="upload-btn" onclick="document.getElementById('img-upload').click()">📷 Import Picture</button>
+    <input type="file" id="img-upload" accept="image/*" style="display:none;" onchange="importImage(event)" />
+  </div>
+
+  <script>
+    const total = 8;
+    let current = 0;
+
+    const defaultSlides = [
+      { title: 'Custom 3D Printing, Made for You', text: 'High quality prints in a range of materials.', btn: true },
+      { title: 'Slide 2', text: 'Add your text here.' },
+      { title: 'Slide 3', text: 'Add your text here.' },
+      { title: 'Slide 4', text: 'Add your text here.' },
+      { title: 'Slide 5', text: 'Add your text here.' },
+      { title: 'Slide 6', text: 'Add your text here.' },
+      { title: 'Slide 7', text: 'Add your text here.' },
+      { title: 'Slide 8', text: 'Add your text here.' },
+    ];
+
+    function buildSlides() {
+      const track = document.getElementById('slides-track');
+      track.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const img = localStorage.getItem('slide_img_' + i) || '';
+        const s   = defaultSlides[i];
+        const div = document.createElement('div');
+        div.className = 'slide';
+        div.id = 'slide-' + i;
+        if (img) div.style.backgroundImage = `url('${img}')`;
+        div.innerHTML = `
+          <div class="slide-content">
+            <h2>${s.title}</h2>
+            <p>${s.text}</p>
+            ${s.btn ? `<a href="products.html" class="btn">Shop Now</a>` : ''}
+          </div>`;
+        track.appendChild(div);
+      }
+    }
+
+    // Build dots
+    function buildDots() {
+      const dotsEl = document.getElementById('slide-dots');
+      dotsEl.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const d = document.createElement('span');
+        d.className = 'dot' + (i === 0 ? ' active' : '');
+        d.onclick = () => goTo(i);
+        dotsEl.appendChild(d);
+      }
+    }
+
+    function goTo(n) {
+      current = (n + total) % total;
+      document.getElementById('slides-track').style.transform = `translateX(-${current * 100}%)`;
+      document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === current));
+    }
+
+    function moveSlide(dir) { goTo(current + dir); }
+
+    // Import picture — saves to current slide
+    function importImage(event) {
+      const file   = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        localStorage.setItem('slide_img_' + current, e.target.result);
+        document.getElementById('slide-' + current).style.backgroundImage = `url('${e.target.result}')`;
+      };
+      reader.readAsDataURL(file);
+      event.target.value = '';
+    }
+
+    buildSlides();
+    buildDots();
+
+    // Auto-advance every 8 seconds
+    setInterval(() => moveSlide(1), 8000);
+  </script>
+
+
+
+  <div style="text-align:center; padding: 2.5rem 0;">
+    <a href="products.html" class="btn" style="font-size:1.1rem; padding: 1rem 3rem;">Our Products</a>
+  </div>
+
+  <section id="quote">
+    <h2>Leave a Review</h2>
+    <form onsubmit="submitReview(event)">
+      <label for="name">Your Name</label>
+      <input type="text" id="name" placeholder="Jane Smith" required />
+
+      <label>Rating</label>
+      <div id="star-rating" style="font-size:2rem; cursor:pointer; letter-spacing:4px;">
+        <span onclick="setRating(1)">☆</span>
+        <span onclick="setRating(2)">☆</span>
+        <span onclick="setRating(3)">☆</span>
+        <span onclick="setRating(4)">☆</span>
+        <span onclick="setRating(5)">☆</span>
+      </div>
+      <input type="hidden" id="rating-val" value="0" />
+
+      <label for="details">Your Review</label>
+      <textarea id="details" rows="4" placeholder="Tell us about your experience..." required></textarea>
+
+      <button type="submit" class="btn">Submit Review</button>
+    </form>
+
+    <div id="reviews-list" style="margin-top:2rem;"></div>
+  </section>
+
+  <script>
+    function setRating(val) {
+      document.getElementById('rating-val').value = val;
+      const stars = document.querySelectorAll('#star-rating span');
+      stars.forEach((s, i) => s.textContent = i < val ? '★' : '☆');
+    }
+
+    function submitReview(e) {
+      e.preventDefault();
+      const name   = document.getElementById('name').value.trim();
+      const rating = parseInt(document.getElementById('rating-val').value);
+      const text   = document.getElementById('details').value.trim();
+
+      if (rating === 0) { alert('Please select a star rating.'); return; }
+
+      const reviews = JSON.parse(localStorage.getItem('reviews') || '[]');
+      reviews.unshift({ name, rating, text });
+      localStorage.setItem('reviews', JSON.stringify(reviews));
+
+      renderReviews();
+      e.target.reset();
+      setRating(0);
+    }
+
+    function renderReviews() {
+      const reviews = JSON.parse(localStorage.getItem('reviews') || '[]');
+      const list    = document.getElementById('reviews-list');
+      if (!reviews.length) { list.innerHTML = ''; return; }
+      list.innerHTML = '<h3 style="margin-bottom:1rem; color:#1a1a2e;">Customer Reviews</h3>' +
+        reviews.map(r => `
+          <div class="review-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${r.name}</strong>
+              <span style="color:#f5a623; font-size:1.1rem;">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+            </div>
+            <p style="color:#555; margin-top:0.4rem;">${r.text}</p>
+          </div>
+        `).join('');
+    }
+
+    window.addEventListener('DOMContentLoaded', renderReviews);
+  </script>
+
+  <section id="contact">
+    <h2>Contact Us</h2>
+    <p>Email: <a href="mailto:hello@3dprintco.com">hello@3dprintco.com</a></p>
+    <p>We typically respond within 24 hours.</p>
+  </section>
+
+  <footer>
+    <p>&copy; 2026 3D Print Co. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>

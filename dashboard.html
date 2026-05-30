@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – 3D Print Co.</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Password Gate -->
+  <div id="gate" style="position:fixed; inset:0; background:#1a1a2e; display:flex; align-items:center; justify-content:center; z-index:999;">
+    <div class="modal-box" style="text-align:center;">
+      <div style="font-size:2.5rem;">📊</div>
+      <h3 style="margin-top:0.5rem;">Admin Dashboard</h3>
+      <p style="color:#999; font-size:0.9rem; margin-bottom:1rem;">Enter your password to continue</p>
+      <input type="password" id="gate-pass" placeholder="Password" onkeydown="if(event.key==='Enter') checkGate()" style="width:100%;" />
+      <button class="btn" onclick="checkGate()" style="margin-top:0.75rem; width:100%;">Enter</button>
+      <p id="gate-error" style="color:#e94560; font-size:0.85rem; margin-top:0.5rem; display:none;">Wrong password.</p>
+    </div>
+  </div>
+
+  <header>
+    <h1>3D Print Co. — Dashboard</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Products</a>
+    <a href="cart.html" class="cart-nav-btn">🛒 Cart (<span class="cart-count">0</span>)</a>
+    </nav>
+  </header>
+
+  <section id="dashboard" style="max-width:960px; margin:0 auto; padding:2.5rem 2rem;">
+
+    <!-- Stat Cards -->
+    <div class="dash-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🛒</div>
+        <div>
+          <div class="stat-number" id="total-orders">0</div>
+          <div class="stat-label">Total Orders</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⭐</div>
+        <div>
+          <div class="stat-number" id="total-reviews">0</div>
+          <div class="stat-label">Reviews</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div>
+          <div class="stat-number" id="total-time">0m</div>
+          <div class="stat-label">Total Time on Site</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📦</div>
+        <div>
+          <div class="stat-number" id="total-products">0</div>
+          <div class="stat-label">Products Listed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Time Per Page -->
+    <div class="dash-section">
+      <h3>⏱ Time Spent Per Page</h3>
+      <div id="time-breakdown"></div>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="dash-section">
+      <h3>🛒 Recent Orders</h3>
+      <div id="orders-list"><p class="empty-dash">No orders yet.</p></div>
+    </div>
+
+    <!-- Reviews -->
+    <div class="dash-section">
+      <h3>⭐ Reviews</h3>
+      <div id="dash-reviews"><p class="empty-dash">No reviews yet.</p></div>
+    </div>
+
+    <!-- Clear Data -->
+    <div style="margin-top:2rem; text-align:right;">
+      <button class="delete-btn" onclick="clearData()">🗑 Clear All Tracking Data</button>
+    </div>
+
+  </section>
+
+  <footer>
+    <p>&copy; 2026 3D Print Co.</p>
+  </footer>
+
+  <script>
+    const ADMIN_PASSWORD = 'admin123';
+
+    function checkGate() {
+      if (document.getElementById('gate-pass').value === ADMIN_PASSWORD) {
+        document.getElementById('gate').style.display = 'none';
+        loadDashboard();
+      } else {
+        document.getElementById('gate-error').style.display = 'block';
+      }
+    }
+
+    function fmtTime(seconds) {
+      if (seconds < 60)   return seconds + 's';
+      if (seconds < 3600) return Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's';
+      return Math.floor(seconds / 3600) + 'h ' + Math.floor((seconds % 3600) / 60) + 'm';
+    }
+
+    const pageNames = {
+      'index.html':          '🏠 Home',
+      'products.html':       '📦 Products',
+      'product-detail.html': '🔍 Product Detail',
+      'checkout.html':       '🛒 Checkout',
+      '':                    '🏠 Home'
+    };
+
+    function loadDashboard() {
+      const orders   = JSON.parse(localStorage.getItem('orders')       || '[]');
+      const reviews  = JSON.parse(localStorage.getItem('reviews')      || '[]');
+      const products = JSON.parse(localStorage.getItem('products')     || '[]');
+      const timeData = JSON.parse(localStorage.getItem('timeTracking') || '{}');
+
+      // Stat cards
+      document.getElementById('total-orders').textContent   = orders.length;
+      document.getElementById('total-reviews').textContent  = reviews.length;
+      document.getElementById('total-products').textContent = products.length;
+      document.getElementById('total-time').textContent     = fmtTime(timeData['_total'] || 0);
+
+      // Time per page
+      const timeEl = document.getElementById('time-breakdown');
+      const pages  = Object.entries(timeData).filter(([k]) => k !== '_total');
+      if (pages.length === 0) {
+        timeEl.innerHTML = '<p class="empty-dash">No time data yet — visit some pages first.</p>';
+      } else {
+        const max = Math.max(...pages.map(([,v]) => v));
+        timeEl.innerHTML = pages.map(([page, secs]) => `
+          <div class="time-row">
+            <span class="time-label">${pageNames[page] || page}</span>
+            <div class="time-bar-wrap">
+              <div class="time-bar" style="width:${Math.round((secs/max)*100)}%"></div>
+            </div>
+            <span class="time-val">${fmtTime(secs)}</span>
+          </div>
+        `).join('');
+      }
+
+      // Orders
+      const ordersEl = document.getElementById('orders-list');
+      if (orders.length === 0) {
+        ordersEl.innerHTML = '<p class="empty-dash">No orders yet.</p>';
+      } else {
+        ordersEl.innerHTML = `
+          <table class="dash-table">
+            <thead><tr><th>Date</th><th>Customer</th><th>Email</th><th>Product</th><th>Price</th></tr></thead>
+            <tbody>${orders.map(o => `
+              <tr>
+                <td>${o.date}</td>
+                <td>${o.name}</td>
+                <td>${o.email}</td>
+                <td>${o.product}</td>
+                <td>${o.price || '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`;
+      }
+
+      // Reviews
+      const revEl = document.getElementById('dash-reviews');
+      if (reviews.length === 0) {
+        revEl.innerHTML = '<p class="empty-dash">No reviews yet.</p>';
+      } else {
+        revEl.innerHTML = reviews.map(r => `
+          <div class="review-card">
+            <div style="display:flex; justify-content:space-between;">
+              <strong>${r.name}</strong>
+              <span style="color:#f5a623;">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+            </div>
+            <p style="color:#555; margin-top:0.4rem;">${r.text}</p>
+          </div>`).join('');
+      }
+    }
+
+    function clearData() {
+      if (confirm('Clear all tracking data (orders, reviews, time)? This cannot be undone.')) {
+        ['orders','reviews','timeTracking','visits'].forEach(k => localStorage.removeItem(k));
+        loadDashboard();
+      }
+    }
+  </script>
+
+</body>
+</html>

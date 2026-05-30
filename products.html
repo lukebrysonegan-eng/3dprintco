@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Our Products – 3D Print Co.</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="tracker.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>3D Print Co.</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="index.html#quote">Get a Quote</a>
+      <a href="index.html#contact">Contact</a>
+    <a href="cart.html" class="cart-nav-btn">🛒 Cart (<span class="cart-count">0</span>)</a>
+    </nav>
+  </header>
+
+  <!-- Admin Login Modal -->
+  <div id="login-modal" style="display:none;">
+    <div class="modal-box">
+      <h3>Admin Login</h3>
+      <input type="password" id="admin-pass" placeholder="Enter password" onkeydown="if(event.key==='Enter') checkLogin()" />
+      <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
+        <button class="btn" onclick="checkLogin()">Login</button>
+        <button class="btn-outline" onclick="closeLogin()">Cancel</button>
+      </div>
+      <p id="login-error" style="color:#e94560; font-size:0.85rem; margin-top:0.5rem; display:none;">Wrong password.</p>
+    </div>
+  </div>
+
+  <section id="products-page">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem;">
+      <h2 style="margin-bottom:0;">Our Products</h2>
+      <span id="admin-badge" style="display:none; background:#1a1a2e; color:white; padding:0.3rem 0.9rem; border-radius:20px; font-size:0.8rem;">
+        Admin Mode &nbsp;<a href="#" onclick="logout()" style="color:#e94560; text-decoration:none;">Log out</a>
+      </span>
+    </div>
+
+    <!-- Add Product Form (admin only) -->
+    <div class="add-product-form" id="add-form" style="display:none;">
+      <h3>+ Add a Product</h3>
+      <div class="form-row">
+        <div>
+          <label for="prod-name">Product Name</label>
+          <input type="text" id="prod-name" placeholder="e.g. Custom Figurine" />
+        </div>
+        <div>
+          <label for="prod-price">Price</label>
+          <input type="text" id="prod-price" placeholder="e.g. $20" />
+        </div>
+      </div>
+      <label for="prod-desc">Description</label>
+      <input type="text" id="prod-desc" placeholder="Short description of the product" />
+      <label for="prod-emoji">Icon (emoji)</label>
+      <input type="text" id="prod-emoji" placeholder="e.g. 🖨️" maxlength="2" />
+      <label>Features <span style="font-weight:400; color:#999; font-size:0.85rem;">(press Enter or comma to add each one)</span></label>
+      <div class="features-input-box" id="features-box" onclick="document.getElementById('feat-input').focus()">
+        <div id="feat-tags"></div>
+        <input type="text" id="feat-input" placeholder="e.g. Waterproof" onkeydown="handleFeatKey(event)" />
+      </div>
+      <button class="btn" onclick="addProduct()">Add Product</button>
+    </div>
+
+    <!-- Product Grid -->
+    <div class="product-grid" id="product-grid"></div>
+
+    <p id="empty-msg" style="color:#aaa; text-align:center; margin-top:2rem; display:none;">No products yet.</p>
+  </section>
+
+  <footer>
+    <p>&copy; 2026 3D Print Co. All rights reserved.</p>
+    <button id="admin-btn" onclick="openLogin()" style="margin-top:0.75rem; background:none; border:none; color:#ccc; font-size:0.75rem; cursor:pointer;">Admin</button>
+  </footer>
+
+  <script>
+    const ADMIN_PASSWORD = 'admin123'; // Change this to your own password
+    let isAdmin = sessionStorage.getItem('adminLoggedIn') === 'true';
+    let currentFeatures = [];
+
+    window.onload = function () {
+      const saved = JSON.parse(localStorage.getItem('products') || '[]');
+      saved.forEach(p => renderCard(p));
+      toggleEmpty();
+      applyAdminView();
+    };
+
+    function openLogin() {
+      document.getElementById('login-modal').style.display = 'flex';
+      document.getElementById('admin-pass').focus();
+    }
+
+    function closeLogin() {
+      document.getElementById('login-modal').style.display = 'none';
+      document.getElementById('admin-pass').value = '';
+      document.getElementById('login-error').style.display = 'none';
+    }
+
+    function checkLogin() {
+      const pass = document.getElementById('admin-pass').value;
+      if (pass === ADMIN_PASSWORD) {
+        isAdmin = true;
+        sessionStorage.setItem('adminLoggedIn', 'true');
+        closeLogin();
+        // Re-render to show delete buttons
+        document.getElementById('product-grid').innerHTML = '';
+        const saved = JSON.parse(localStorage.getItem('products') || '[]');
+        saved.forEach(p => renderCard(p));
+        toggleEmpty();
+        applyAdminView();
+      } else {
+        document.getElementById('login-error').style.display = 'block';
+      }
+    }
+
+    function logout() {
+      isAdmin = false;
+      sessionStorage.removeItem('adminLoggedIn');
+      // Re-render without delete buttons
+      document.getElementById('product-grid').innerHTML = '';
+      const saved = JSON.parse(localStorage.getItem('products') || '[]');
+      saved.forEach(p => renderCard(p));
+      toggleEmpty();
+      applyAdminView();
+    }
+
+    function applyAdminView() {
+      document.getElementById('add-form').style.display    = isAdmin ? 'flex' : 'none';
+      document.getElementById('admin-badge').style.display = isAdmin ? 'inline-block' : 'none';
+    }
+
+    function handleFeatKey(e) {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = document.getElementById('feat-input').value.replace(',','').trim();
+        if (val) addFeatureTag(val);
+        document.getElementById('feat-input').value = '';
+      } else if (e.key === 'Backspace' && document.getElementById('feat-input').value === '' && currentFeatures.length) {
+        currentFeatures.pop();
+        renderFeatureTags();
+      }
+    }
+
+    function addFeatureTag(val) {
+      currentFeatures.push(val);
+      renderFeatureTags();
+    }
+
+    function removeFeature(i) {
+      currentFeatures.splice(i, 1);
+      renderFeatureTags();
+    }
+
+    function renderFeatureTags() {
+      const container = document.getElementById('feat-tags');
+      container.innerHTML = currentFeatures.map((f, i) =>
+        `<span class="feat-tag">${f} <span onclick="removeFeature(${i})">✕</span></span>`
+      ).join('');
+    }
+
+    function addProduct() {
+      const name  = document.getElementById('prod-name').value.trim();
+      const price = document.getElementById('prod-price').value.trim();
+      const desc  = document.getElementById('prod-desc').value.trim();
+      const emoji = document.getElementById('prod-emoji').value.trim() || '📦';
+
+      // Capture any unsaved feature still in the input
+      const lastFeat = document.getElementById('feat-input').value.trim();
+      if (lastFeat) currentFeatures.push(lastFeat);
+
+      if (!name) { alert('Please enter a product name.'); return; }
+
+      const product = { name, price, desc, emoji, features: [...currentFeatures] };
+      const saved = JSON.parse(localStorage.getItem('products') || '[]');
+      saved.push(product);
+      localStorage.setItem('products', JSON.stringify(saved));
+
+      renderCard(product);
+      toggleEmpty();
+
+      document.getElementById('prod-name').value  = '';
+      document.getElementById('prod-price').value = '';
+      document.getElementById('prod-desc').value  = '';
+      document.getElementById('prod-emoji').value = '';
+      document.getElementById('feat-input').value = '';
+      currentFeatures = [];
+      renderFeatureTags();
+    }
+
+    function renderCard(p) {
+      const grid = document.getElementById('product-grid');
+      const card = document.createElement('div');
+      card.className = 'card';
+      const slug = encodeURIComponent(p.name);
+      card.innerHTML = `
+        <a href="product-detail.html?name=${slug}" class="card-link">
+          <div class="card-img">${p.emoji}</div>
+          <h3>${p.name}</h3>
+          ${p.price ? `<span class="price">${p.price}</span>` : ''}
+        </a>
+        ${isAdmin ? `<button class="delete-btn" onclick="deleteCard(this, '${p.name}')">✕ Remove</button>` : ''}
+      `;
+      grid.appendChild(card);
+    }
+
+    function deleteCard(btn, name) {
+      btn.parentElement.remove();
+      let saved = JSON.parse(localStorage.getItem('products') || '[]');
+      saved = saved.filter(p => p.name !== name);
+      localStorage.setItem('products', JSON.stringify(saved));
+      toggleEmpty();
+    }
+
+    function toggleEmpty() {
+      const grid = document.getElementById('product-grid');
+      document.getElementById('empty-msg').style.display = grid.children.length === 0 ? 'block' : 'none';
+    }
+  </script>
+
+</body>
+</html>
