@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Hub – 3D Print Co.</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f0f1a;
+      --surface: #1a1a2e;
+      --card:    #22223b;
+      --border:  #2e2e4a;
+      --accent:  #e94560;
+      --accent2: #4fc3f7;
+      --green:   #4caf50;
+      --yellow:  #ffc107;
+      --text:    #e8e8f0;
+      --muted:   #888aaa;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Gate ── */
+    #gate {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999;
+    }
+    .gate-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
+    .gate-box .icon { font-size: 2.5rem; margin-bottom: .75rem; }
+    .gate-box h2 { margin-bottom: .4rem; }
+    .gate-box p { color: var(--muted); font-size: .88rem; margin-bottom: 1.2rem; }
+    .gate-box input {
+      width: 100%; padding: .6rem .9rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: .95rem;
+      margin-bottom: .75rem;
+    }
+    .gate-box input:focus { outline: none; border-color: var(--accent2); }
+    #gate-err { color: var(--accent); font-size: .82rem; margin-top: .4rem; display: none; }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: .9rem 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 1.15rem; letter-spacing: .5px; }
+    header nav a {
+      color: var(--muted); text-decoration: none; margin-left: 1.2rem;
+      font-size: .88rem; transition: color .2s;
+    }
+    header nav a:hover { color: var(--text); }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex; gap: .5rem; padding: 1.4rem 2rem .5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .tab {
+      padding: .5rem 1.1rem; border-radius: 8px;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; font-size: .88rem;
+      transition: all .2s;
+    }
+    .tab:hover { border-color: var(--accent2); color: var(--text); }
+    .tab.active {
+      background: var(--accent); border-color: var(--accent);
+      color: #fff; font-weight: 600;
+    }
+
+    /* ── Pages ── */
+    .page { display: none; padding: 2rem; max-width: 1100px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    /* ── Stat row ── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem; margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.2rem 1.4rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .stat-card .ico { font-size: 2rem; }
+    .stat-card .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .stat-card .lbl { font-size: .78rem; color: var(--muted); margin-top: .25rem; }
+
+    /* ── Section header ── */
+    .sec-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .sec-head h2 { font-size: 1rem; font-weight: 600; }
+
+    /* ── Table ── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th {
+      text-align: left; padding: .55rem .8rem;
+      background: var(--surface); color: var(--muted);
+      font-weight: 600; font-size: .78rem; text-transform: uppercase;
+      letter-spacing: .04em; border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: .6rem .8rem; border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.03); }
+    .empty { color: var(--muted); text-align: center; padding: 2rem; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block; padding: .2rem .55rem;
+      border-radius: 20px; font-size: .75rem; font-weight: 600;
+    }
+    .badge-fulfilled { background: rgba(76,175,80,.18); color: var(--green); }
+    .badge-pending   { background: rgba(255,193,7,.15); color: var(--yellow); }
+
+    /* ── Contact cards ── */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .contact-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.2rem;
+    }
+    .contact-card .c-name { font-weight: 600; margin-bottom: .2rem; }
+    .contact-card .c-email { font-size: .8rem; color: var(--accent2); margin-bottom: .6rem; }
+    .contact-card .c-msg {
+      font-size: .87rem; color: var(--text);
+      background: var(--surface); border-radius: 8px;
+      padding: .75rem; line-height: 1.5;
+    }
+    .contact-card .c-meta { font-size: .75rem; color: var(--muted); margin-top: .6rem; }
+    .stars { color: #ffc107; letter-spacing: .1em; }
+
+    /* ── Time bars ── */
+    .page-bar { margin-bottom: .7rem; }
+    .bar-label { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: .25rem; }
+    .bar-track {
+      height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      transition: width .5s ease;
+    }
+
+    /* ── Btn ── */
+    .btn {
+      padding: .55rem 1.1rem; border-radius: 8px;
+      background: var(--accent); border: none; color: #fff;
+      cursor: pointer; font-size: .88rem; font-weight: 600;
+      transition: opacity .2s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-ghost {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+    }
+    .btn-ghost:hover { border-color: var(--accent2); color: var(--text); }
+
+    /* ── Search/filter bar ── */
+    .filter-bar { display: flex; gap: .6rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+    .filter-bar input, .filter-bar select {
+      padding: .45rem .8rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: .87rem;
+    }
+    .filter-bar input:focus, .filter-bar select:focus {
+      outline: none; border-color: var(--accent2);
+    }
+
+    /* ── Order detail modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 900; display: none;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 2rem; max-width: 520px; width: 90%;
+      box-shadow: 0 12px 40px rgba(0,0,0,.6);
+    }
+    .modal-box h3 { margin-bottom: 1rem; }
+    .detail-row { display: flex; justify-content: space-between; padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row span:first-child { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- Password Gate -->
+<div id="gate">
+  <div class="gate-box">
+    <div class="icon">🔒</div>
+    <h2>Admin Hub</h2>
+    <p>Enter your password to access the dashboard</p>
+    <input type="password" id="gate-pass" placeholder="Password"
+           onkeydown="if(event.key==='Enter') checkGate()" />
+    <button class="btn" style="width:100%" onclick="checkGate()">Enter</button>
+    <p id="gate-err">Wrong password.</p>
+  </div>
+</div>
+
+<!-- New order toast -->
+<div id="toast" style="
+  position:fixed; top:1.2rem; right:1.2rem; z-index:9999;
+  background:var(--green); color:#fff;
+  padding:.75rem 1.2rem; border-radius:10px;
+  font-weight:600; font-size:.9rem;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);
+  display:none; align-items:center; gap:.6rem;
+">🛒 <span id="toast-msg">New order received!</span></div>
+
+<!-- Header -->
+<header>
+  <h1>📊 Admin Hub</h1>
+  <nav>
+    <a href="index.html">Store</a>
+    <a href="dashboard.html">Old Dashboard</a>
+    <a href="../sales-tracker/index.html">Sales Tracker</a>
+  </nav>
+</header>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('overview')">Overview</button>
+  <button class="tab" onclick="switchTab('orders')">Orders</button>
+  <button class="tab" onclick="switchTab('time')">Time on Site</button>
+  <button class="tab" onclick="switchTab('contacts')">Contacts & Reviews</button>
+</div>
+
+<!-- ── OVERVIEW ─────────────────────────────────────────── -->
+<div id="page-overview" class="page active">
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="ico">🛒</div>
+      <div><div class="num" id="ov-orders">0</div><div class="lbl">Total Orders</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="ico">✅</div>
+      <div><div class="num" id="ov-fulfilled">0</div><div class="lbl">Fulfilled</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="ico">⏳</div>
+      <div><div class="num" id="ov-pending">0</div><div class="lbl">Pending</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="ico">⏱️</div>
+      <div><div class="num" id="ov-time">0h 0m</div><div class="lbl">Total Time on Site</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="ico">💬</div>
+      <div><div class="num" id="ov-reviews">0</div><div class="lbl">Customer Reviews</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="ico">⭐</div>
+      <div><div class="num" id="ov-rating">—</div><div class="lbl">Avg Rating</div></div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; flex-wrap:wrap;">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.4rem;">
+      <div class="sec-head"><h2>Recent Orders</h2></div>
+      <div id="ov-recent-orders"><p class="empty">No orders yet</p></div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.4rem;">
+      <div class="sec-head"><h2>Top Pages by Time</h2></div>
+      <div id="ov-pages"><p class="empty">No tracking data</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ORDERS ─────────────────────────────────────────────── -->
+<div id="page-orders" class="page">
+  <div class="filter-bar">
+    <input id="ord-search" type="text" placeholder="Search customer or product…" oninput="renderOrders()" style="flex:1;min-width:180px" />
+    <select id="ord-filter" onchange="renderOrders()">
+      <option value="">All Statuses</option>
+      <option value="pending">Pending</option>
+      <option value="fulfilled">Fulfilled</option>
+    </select>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Email</th>
+          <th>Product</th>
+          <th>Color</th>
+          <th>Qty</th>
+          <th>Price</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="orders-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── TIME ───────────────────────────────────────────────── -->
+<div id="page-time" class="page">
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="ico">⏱️</div>
+      <div><div class="num" id="t-total">0h 0m</div><div class="lbl">Total Time</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="ico">📄</div>
+      <div><div class="num" id="t-pages">0</div><div class="lbl">Pages Tracked</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="ico">👁️</div>
+      <div><div class="num" id="t-visits">0</div><div class="lbl">Total Visits</div></div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.4rem;">
+      <div class="sec-head"><h2>Time Per Page</h2></div>
+      <div id="pages-bars"><p class="empty">No data yet</p></div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.4rem;">
+      <div class="sec-head"><h2>Recent Visits</h2></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Page</th><th>Time Spent</th><th>Date</th><th>At</th></tr></thead>
+          <tbody id="visits-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONTACTS & REVIEWS ─────────────────────────────────── -->
+<div id="page-contacts" class="page">
+  <div class="filter-bar">
+    <input id="rev-search" type="text" placeholder="Search name or review text…" oninput="renderContacts()" style="flex:1;min-width:180px" />
+    <select id="rev-stars" onchange="renderContacts()">
+      <option value="">All Ratings</option>
+      <option value="5">5 Stars</option>
+      <option value="4">4 Stars</option>
+      <option value="3">3 Stars</option>
+      <option value="2">2 Stars</option>
+      <option value="1">1 Star</option>
+    </select>
+  </div>
+  <div id="contacts-grid" class="contact-grid"></div>
+</div>
+
+<!-- Order detail modal -->
+<div class="modal-overlay" id="order-modal">
+  <div class="modal-box">
+    <h3>Order Details</h3>
+    <div id="order-detail-body"></div>
+    <div style="margin-top:1.2rem;display:flex;gap:.6rem;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeOrderModal()">Close</button>
+      <button class="btn" id="fulfill-btn" onclick="fulfillCurrentOrder()">Mark Fulfilled</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Auth ──────────────────────────────────────────────────────
+const PASS = 'lukeluke';
+
+function checkGate() {
+  if (document.getElementById('gate-pass').value === PASS) {
+    document.getElementById('gate').style.display = 'none';
+    loadAll();
+  } else {
+    const err = document.getElementById('gate-err');
+    err.style.display = 'block';
+    setTimeout(() => err.style.display = 'none', 2000);
+  }
+}
+
+// ── Data access ───────────────────────────────────────────────
+const getOrders   = () => JSON.parse(localStorage.getItem('orders')       || '[]');
+const getSales    = () => JSON.parse(localStorage.getItem('st_sales')     || '[]');
+const getTracking = () => JSON.parse(localStorage.getItem('timeTracking') || '{}');
+const getVisits   = () => JSON.parse(localStorage.getItem('visits')       || '[]');
+const getReviews  = () => JSON.parse(localStorage.getItem('reviews')      || '[]');
+
+function saveOrders(d) { localStorage.setItem('orders', JSON.stringify(d)); }
+
+// ── Helpers ───────────────────────────────────────────────────
+const fmtHM = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); return `${h}h ${m}m`; };
+const fmtSec = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; };
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const badge = status => {
+  const s = (status||'pending').toLowerCase();
+  return `<span class="badge badge-${s}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`;
+};
+const stars = n => '<span class="stars">' + '★'.repeat(n) + '<span style="opacity:.3">' + '★'.repeat(5-n) + '</span></span>';
+
+// ── Tab switching ──────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'overview')  renderOverview();
+  if (tab === 'orders')    renderOrders();
+  if (tab === 'time')      renderTime();
+  if (tab === 'contacts')  renderContacts();
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────
+function renderOverview() {
+  const orders   = getOrders();
+  const reviews  = getReviews();
+  const tracking = getTracking();
+  const visits   = getVisits();
+
+  // Orders: use 'status' field; if absent treat as pending
+  const fulfilled = orders.filter(o => (o.status || 'pending') === 'fulfilled');
+  const pending   = orders.filter(o => (o.status || 'pending') === 'pending');
+
+  document.getElementById('ov-orders').textContent    = orders.length;
+  document.getElementById('ov-fulfilled').textContent = fulfilled.length;
+  document.getElementById('ov-pending').textContent   = pending.length;
+  document.getElementById('ov-reviews').textContent   = reviews.length;
+
+  const total = tracking._total || 0;
+  document.getElementById('ov-time').textContent = fmtHM(total);
+
+  if (reviews.length) {
+    const avg = reviews.reduce((a,r) => a + r.rating, 0) / reviews.length;
+    document.getElementById('ov-rating').textContent = avg.toFixed(1) + ' ★';
+  } else {
+    document.getElementById('ov-rating').textContent = '—';
+  }
+
+  // Recent orders
+  const recent = [...orders].slice(0, 6);
+  const ovEl = document.getElementById('ov-recent-orders');
+  if (!recent.length) { ovEl.innerHTML = '<p class="empty">No orders yet</p>'; }
+  else {
+    ovEl.innerHTML = recent.map(o => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.85rem">
+        <span>${esc(o.name || '—')}</span>
+        <span style="color:var(--muted)">${esc(o.product || '—')}</span>
+        ${badge(o.status || 'pending')}
+      </div>`).join('');
+  }
+
+  // Top pages
+  const pagesEl = document.getElementById('ov-pages');
+  const entries = Object.entries(tracking).filter(([k]) => k !== '_total').sort((a,b) => b[1]-a[1]).slice(0,6);
+  if (!entries.length) { pagesEl.innerHTML = '<p class="empty">No tracking data</p>'; }
+  else {
+    const max = entries[0][1];
+    pagesEl.innerHTML = entries.map(([page, secs]) => `
+      <div class="page-bar">
+        <div class="bar-label"><span>${esc(page)}</span><span style="color:var(--muted)">${fmtHM(secs)}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(secs/max*100).toFixed(1)}%"></div></div>
+      </div>`).join('');
+  }
+}
+
+// ── ORDERS ────────────────────────────────────────────────────
+let currentOrderIndex = null;
+
+function renderOrders() {
+  const q      = (document.getElementById('ord-search')?.value || '').toLowerCase();
+  const filter = document.getElementById('ord-filter')?.value || '';
+  let orders   = getOrders().map((o, i) => ({ ...o, _idx: i }));
+
+  if (q)      orders = orders.filter(o => (o.name||'').toLowerCase().includes(q) || (o.product||'').toLowerCase().includes(q) || (o.email||'').toLowerCase().includes(q));
+  if (filter) orders = orders.filter(o => (o.status || 'pending') === filter);
+
+  const tbody = document.getElementById('orders-body');
+  if (!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No orders match your filter</td></tr>';
+    return;
+  }
+  tbody.innerHTML = orders.map(o => `
+    <tr>
+      <td>${esc(o.name || '—')}</td>
+      <td style="color:var(--muted);font-size:.8rem">${esc(o.email || '—')}</td>
+      <td>${esc(o.product || '—')}</td>
+      <td>${esc(o.color || '—')}</td>
+      <td>${o.qty || 1}</td>
+      <td>${esc(o.price || '—')}</td>
+      <td>${badge(o.status || 'pending')}</td>
+      <td style="color:var(--muted);font-size:.8rem">${esc(o.date || '—')}</td>
+      <td><button class="btn btn-ghost" style="font-size:.78rem;padding:.3rem .6rem" onclick="openOrderModal(${o._idx})">View</button></td>
+    </tr>`).join('');
+}
+
+function openOrderModal(idx) {
+  currentOrderIndex = idx;
+  const order = getOrders()[idx];
+  if (!order) return;
+  const status = order.status || 'pending';
+
+  document.getElementById('order-detail-body').innerHTML = `
+    <div class="detail-row"><span>Customer</span><span>${esc(order.name || '—')}</span></div>
+    <div class="detail-row"><span>Email</span><span style="color:var(--accent2)">${esc(order.email || '—')}</span></div>
+    <div class="detail-row"><span>Product</span><span>${esc(order.product || '—')}</span></div>
+    <div class="detail-row"><span>Color</span><span>${esc(order.color || '—')}</span></div>
+    <div class="detail-row"><span>Quantity</span><span>${order.qty || 1}</span></div>
+    <div class="detail-row"><span>Price</span><span>${esc(order.price || '—')}</span></div>
+    <div class="detail-row"><span>Status</span><span>${badge(status)}</span></div>
+    <div class="detail-row"><span>Date</span><span>${esc(order.date || '—')}</span></div>
+  `;
+
+  const btn = document.getElementById('fulfill-btn');
+  if (status === 'fulfilled') {
+    btn.textContent = 'Already Fulfilled';
+    btn.disabled = true;
+    btn.style.opacity = '.5';
+  } else {
+    btn.textContent = 'Mark Fulfilled';
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+
+  document.getElementById('order-modal').classList.add('open');
+}
+
+function closeOrderModal() {
+  document.getElementById('order-modal').classList.remove('open');
+  currentOrderIndex = null;
+}
+
+function fulfillCurrentOrder() {
+  if (currentOrderIndex === null) return;
+  const orders = getOrders();
+  orders[currentOrderIndex].status = 'fulfilled';
+  saveOrders(orders);
+  closeOrderModal();
+  renderOrders();
+  renderOverview();
+}
+
+document.getElementById('order-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeOrderModal();
+});
+
+// ── TIME ──────────────────────────────────────────────────────
+function renderTime() {
+  const tracking = getTracking();
+  const visits   = getVisits();
+
+  const total  = tracking._total || 0;
+  const pages  = Object.keys(tracking).filter(k => k !== '_total');
+  document.getElementById('t-total').textContent  = fmtHM(total);
+  document.getElementById('t-pages').textContent  = pages.length;
+  document.getElementById('t-visits').textContent = visits.length;
+
+  // Bars
+  const barsEl  = document.getElementById('pages-bars');
+  const entries = Object.entries(tracking).filter(([k]) => k !== '_total').sort((a,b) => b[1]-a[1]);
+  if (!entries.length) { barsEl.innerHTML = '<p class="empty">No tracking data yet</p>'; }
+  else {
+    const max = entries[0][1];
+    barsEl.innerHTML = entries.map(([page, secs]) => `
+      <div class="page-bar">
+        <div class="bar-label"><span>${esc(page)}</span><span style="color:var(--muted)">${fmtHM(secs)}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(secs/max*100).toFixed(1)}%"></div></div>
+      </div>`).join('');
+  }
+
+  // Visits table
+  const tbody = document.getElementById('visits-body');
+  if (!visits.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No visits recorded yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = visits.map(v => `
+    <tr>
+      <td>${esc(v.page)}</td>
+      <td>${fmtSec(v.seconds || 0)}</td>
+      <td style="color:var(--muted);font-size:.8rem">${esc(v.date || '—')}</td>
+      <td style="color:var(--muted);font-size:.8rem">${esc(v.time || '—')}</td>
+    </tr>`).join('');
+}
+
+// ── CONTACTS & REVIEWS ────────────────────────────────────────
+function renderContacts() {
+  const q     = (document.getElementById('rev-search')?.value || '').toLowerCase();
+  const stars_f = document.getElementById('rev-stars')?.value || '';
+  let reviews = getReviews();
+
+  if (q)       reviews = reviews.filter(r => (r.name||'').toLowerCase().includes(q) || (r.text||'').toLowerCase().includes(q));
+  if (stars_f) reviews = reviews.filter(r => String(r.rating) === stars_f);
+
+  const grid = document.getElementById('contacts-grid');
+  if (!reviews.length) {
+    grid.innerHTML = '<p class="empty" style="grid-column:1/-1">No reviews yet — they\'ll appear here once customers leave them on the store.</p>';
+    return;
+  }
+  grid.innerHTML = reviews.map(r => `
+    <div class="contact-card">
+      <div class="c-name">${esc(r.name || 'Anonymous')}</div>
+      <div class="c-email">${esc(r.email || '')}</div>
+      <div>${stars(r.rating || 0)}</div>
+      <div class="c-msg" style="margin-top:.6rem">${esc(r.text || '(no message)')}</div>
+      <div class="c-meta">${esc(r.date || '')}</div>
+    </div>`).join('');
+}
+
+// ── Live refresh ──────────────────────────────────────────────
+// Re-renders the active tab every 3 seconds so new orders from
+// the store appear automatically without refreshing the page.
+let _lastOrderCount = -1;
+let _lastReviewCount = -1;
+
+function autoRefresh() {
+  const orders  = getOrders();
+  const reviews = getReviews();
+
+  // Toast + flash the Orders tab if a new order came in
+  if (_lastOrderCount >= 0 && orders.length > _lastOrderCount) {
+    const newCount = orders.length - _lastOrderCount;
+    const toast = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = newCount === 1 ? 'New order received!' : `${newCount} new orders received!`;
+    toast.style.display = 'flex';
+    setTimeout(() => { toast.style.display = 'none'; }, 5000);
+    const tab = document.querySelector('.tab[onclick*="orders"]');
+    if (tab) {
+      tab.style.background = 'var(--green)';
+      tab.style.borderColor = 'var(--green)';
+      tab.style.color = '#fff';
+      setTimeout(() => {
+        if (!tab.classList.contains('active')) {
+          tab.style.background = '';
+          tab.style.borderColor = '';
+          tab.style.color = '';
+        }
+      }, 3000);
+    }
+  }
+  _lastOrderCount  = orders.length;
+  _lastReviewCount = reviews.length;
+
+  // Re-render whichever page is active
+  const active = document.querySelector('.page.active');
+  if (!active) return;
+  const id = active.id;
+  if (id === 'page-overview')  renderOverview();
+  if (id === 'page-orders')    renderOrders();
+  if (id === 'page-time')      renderTime();
+  if (id === 'page-contacts')  renderContacts();
+}
+
+// ── Init ──────────────────────────────────────────────────────
+function loadAll() {
+  renderOverview();
+  _lastOrderCount  = getOrders().length;
+  _lastReviewCount = getReviews().length;
+  setInterval(autoRefresh, 3000);
+}
+</script>
+
+</body>
+</html>

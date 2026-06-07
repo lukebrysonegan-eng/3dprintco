@@ -6,6 +6,8 @@
   <title>Checkout – 3D Print Co.</title>
   <link rel="stylesheet" href="style.css" />
   <script src="tracker.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>emailjs.init('GuxsdtlVMkOSslqLP');</script>
 </head>
 <body>
 
@@ -28,7 +30,7 @@
       <div class="order-summary">
         <h3>Order Summary</h3>
         <div id="order-item">
-          <p id="order-name" style="font-size:1.2rem; font-weight:bold; color:#1a1a2e;"></p>
+          <p id="order-name" style="font-size:1.2rem; font-weight:bold; color:white;"></p>
           <p id="order-price" style="color:#e94560; font-size:1.1rem; margin-top:0.25rem;"></p>
         </div>
         <hr style="margin:1rem 0; border:none; border-top:1px solid #eee;" />
@@ -97,69 +99,67 @@
 
   <script>
     window.onload = function () {
-      const params   = new URLSearchParams(window.location.search);
-      const fromCart = params.get('from') === 'cart';
-      const orderEl  = document.getElementById('order-item');
-      const backBtn  = document.getElementById('back-btn');
+      const params  = new URLSearchParams(window.location.search);
+      const cart    = JSON.parse(localStorage.getItem('cart') || '[]');
+      const orderEl = document.getElementById('order-item');
+      const backBtn = document.getElementById('back-btn');
 
-      if (fromCart) {
-        // Show all cart items in the summary
+      if (cart.length > 0) {
+        // ---- Cart checkout ----
         backBtn.href = 'cart.html';
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-
-        if (cart.length === 0) {
-          orderEl.innerHTML = '<p style="color:#aac4e8;">Your cart is empty.</p>';
-          return;
-        }
-
         let grandTotal = 0;
-        orderEl.innerHTML = cart.map(item => {
-          const lineTotal = item.unitPrice ? (item.unitPrice * item.qty) : 0;
+        let html = '';
+
+        cart.forEach(item => {
+          const lineTotal = item.unitPrice ? item.unitPrice * item.qty : 0;
           grandTotal += lineTotal;
-          return `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; padding-bottom:0.75rem; border-bottom:1px solid rgba(255,255,255,0.1);">
+          html += `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;
+                        margin-bottom:0.75rem; padding-bottom:0.75rem;
+                        border-bottom:1px solid rgba(255,255,255,0.15);">
               <div>
-                <p style="font-weight:bold; color:white; margin:0;">${item.emoji || '📦'} ${item.name}</p>
-                <p style="color:#aac4e8; font-size:0.85rem; margin:0.2rem 0 0;">
-                  ${item.color ? '🎨 ' + item.color + ' &nbsp;·&nbsp; ' : ''} Qty: ${item.qty}
+                <p style="font-weight:bold; color:white; margin:0; font-size:1rem;">
+                  ${item.emoji || '📦'} ${item.name}
+                </p>
+                <p style="color:#aac4e8; font-size:0.85rem; margin:0.25rem 0 0;">
+                  ${item.color ? '🎨 ' + item.color + '  ·  ' : ''}Qty: ${item.qty}
                 </p>
               </div>
-              <span style="color:#e94560; font-weight:bold; white-space:nowrap;">
-                ${item.unitPrice ? '$' + (item.unitPrice * item.qty).toFixed(2) : '—'}
+              <span style="color:#e94560; font-weight:bold; margin-left:1rem;">
+                ${lineTotal > 0 ? '$' + lineTotal.toFixed(2) : '—'}
               </span>
             </div>`;
-        }).join('');
+        });
 
         if (grandTotal > 0) {
-          orderEl.innerHTML += `
-            <div style="display:flex; justify-content:space-between; margin-top:0.5rem; font-weight:bold; color:white; font-size:1.1rem;">
+          html += `
+            <div style="display:flex; justify-content:space-between; margin-top:0.75rem;
+                        font-weight:bold; color:white; font-size:1.1rem; border-top:1px solid rgba(255,255,255,0.3); padding-top:0.75rem;">
               <span>Total</span>
-              <span>$${grandTotal.toFixed(2)}</span>
+              <span style="color:#e94560;">$${grandTotal.toFixed(2)}</span>
             </div>`;
         }
 
+        orderEl.innerHTML = html;
+
       } else {
-        // Single product from detail page
-        const name  = decodeURIComponent(params.get('name')  || 'Unknown Product');
+        // ---- Single product checkout (URL params) ----
+        const name  = decodeURIComponent(params.get('name')  || '');
         const price = decodeURIComponent(params.get('price') || '');
         const color = decodeURIComponent(params.get('color') || '');
         const qty   = parseInt(params.get('qty') || '1');
 
-        document.getElementById('order-name').textContent  = name;
-        document.getElementById('order-price').textContent = price || 'Price on request';
+        if (!name) {
+          orderEl.innerHTML = '<p style="color:#aac4e8;">No items found. <a href="products.html" style="color:#e94560;">Go back to products.</a></p>';
+          return;
+        }
 
-        if (color) {
-          const colorLine = document.createElement('p');
-          colorLine.textContent = '🎨 Color: ' + color;
-          colorLine.style.cssText = 'color:#aac4e8; font-size:0.9rem; margin-top:0.4rem;';
-          orderEl.appendChild(colorLine);
-        }
-        if (qty > 1) {
-          const qtyLine = document.createElement('p');
-          qtyLine.textContent = '📦 Quantity: ' + qty;
-          qtyLine.style.cssText = 'color:#aac4e8; font-size:0.9rem; margin-top:0.2rem;';
-          orderEl.appendChild(qtyLine);
-        }
+        orderEl.innerHTML = `
+          <p style="font-weight:bold; color:white; font-size:1.1rem; margin:0;">${name}</p>
+          ${color ? `<p style="color:#aac4e8; margin:0.3rem 0 0;">🎨 ${color}</p>` : ''}
+          ${qty > 1 ? `<p style="color:#aac4e8; margin:0.3rem 0 0;">📦 Qty: ${qty}</p>` : ''}
+          ${price ? `<p style="color:#e94560; font-weight:bold; font-size:1.1rem; margin:0.5rem 0 0;">${price}</p>` : ''}
+        `;
 
         const slug = encodeURIComponent(params.get('name') || '');
         backBtn.href = `product-detail.html?name=${slug}`;
@@ -205,6 +205,27 @@
         orders.unshift({ product, price: decodeURIComponent(params.get('price') || ''), color, qty, name: customer, email, date });
         localStorage.setItem('orders', JSON.stringify(orders));
       }
+
+      // Send email notification
+      const customer = document.getElementById('first-name').value + ' ' + document.getElementById('last-name').value;
+      const email    = document.getElementById('email').value;
+      const fromCart = new URLSearchParams(window.location.search).get('from') === 'cart';
+      let summary = '';
+
+      if (fromCart) {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        summary = cart.map(i => `• ${i.emoji || ''} ${i.name} | Color: ${i.color || '—'} | Qty: ${i.qty} | $${i.unitPrice ? (i.unitPrice * i.qty).toFixed(2) : '—'}`).join('\n');
+      } else {
+        const p = new URLSearchParams(window.location.search);
+        summary = `• ${decodeURIComponent(p.get('name') || '')} | Color: ${decodeURIComponent(p.get('color') || '—')} | Qty: ${p.get('qty') || 1} | ${decodeURIComponent(p.get('price') || '—')}`;
+      }
+
+      emailjs.send('service_me0vzep', 'template_hdm2b18', {
+        subject:    '🛒 New Order from ' + customer,
+        from_name:  customer,
+        from_email: email,
+        message:    'New order received!\n\n' + summary + '\n\nCustomer Email: ' + email + '\nDate: ' + new Date().toLocaleString()
+      });
 
       document.getElementById('success-overlay').style.display = 'flex';
     }

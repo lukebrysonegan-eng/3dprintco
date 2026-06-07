@@ -6,6 +6,8 @@
   <title>3D Print Business</title>
   <link rel="stylesheet" href="style.css" />
   <script src="tracker.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>emailjs.init('GuxsdtlVMkOSslqLP');</script>
 </head>
 <body>
 
@@ -159,6 +161,14 @@
       const reviews = JSON.parse(localStorage.getItem('reviews') || '[]');
       reviews.unshift({ name, rating, text });
       localStorage.setItem('reviews', JSON.stringify(reviews));
+
+      // Send email notification
+      emailjs.send('service_me0vzep', 'template_hdm2b18', {
+        subject:    '⭐ New Review from ' + name,
+        from_name:  name,
+        from_email: 'lukebrysonegan@gmail.com',
+        message:    'New review left on your site!\n\nFrom: ' + name + '\nRating: ' + '★'.repeat(rating) + ' (' + rating + '/5)\nReview: ' + text + '\nDate: ' + new Date().toLocaleString()
+      });
 
       renderReviews();
       e.target.reset();
