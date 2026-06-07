@@ -94,6 +94,8 @@
 
   <script>
     const ADMIN_PASSWORD = 'admin123';
+    const BIN_ID  = '6a24e03df5f4af5e29c4c6f5';
+    const BIN_KEY = '$2a$10$3Hmgr9vhBL6llUnzOvvoLeE/J/hjYHE9IKRMZN9hrRGHse3TIl4eG';
 
     function checkGate() {
       if (document.getElementById('gate-pass').value === ADMIN_PASSWORD) {
@@ -118,8 +120,19 @@
       '':                    '🏠 Home'
     };
 
-    function loadDashboard() {
-      const orders   = JSON.parse(localStorage.getItem('orders')       || '[]');
+    async function loadDashboard() {
+      // Fetch orders from cloud
+      let orders = [];
+      try {
+        const res  = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+          headers: { 'X-Master-Key': BIN_KEY }
+        });
+        const data = await res.json();
+        orders = data.record.orders || [];
+      } catch(e) {
+        orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      }
+
       const reviews  = JSON.parse(localStorage.getItem('reviews')      || '[]');
       const products = JSON.parse(localStorage.getItem('products')     || '[]');
       const timeData = JSON.parse(localStorage.getItem('timeTracking') || '{}');

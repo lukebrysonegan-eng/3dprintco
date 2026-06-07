@@ -166,60 +166,66 @@
       }
     };
 
-    function submitOrder(e) {
+    const BIN_ID  = '6a24e03df5f4af5e29c4c6f5';
+    const BIN_KEY = '$2a$10$3Hmgr9vhBL6llUnzOvvoLeE/J/hjYHE9IKRMZN9hrRGHse3TIl4eG';
+
+    async function saveOrderToCloud(newOrders) {
+      try {
+        // Fetch existing orders from JSONBin
+        const res  = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+          headers: { 'X-Master-Key': BIN_KEY }
+        });
+        const data = await res.json();
+        const existing = data.record.orders || [];
+        const combined = [...newOrders, ...existing];
+
+        // Save back
+        await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Master-Key': BIN_KEY },
+          body:    JSON.stringify({ orders: combined })
+        });
+      } catch(e) {
+        console.warn('Could not save order to cloud:', e);
+      }
+    }
+
+    async function submitOrder(e) {
       e.preventDefault();
-      const params    = new URLSearchParams(window.location.search);
-      const fromCart  = params.get('from') === 'cart';
-      const customer  = document.getElementById('first-name').value + ' ' + document.getElementById('last-name').value;
-      const email     = document.getElementById('email').value;
-      const date      = new Date().toLocaleDateString();
-      const orders    = JSON.parse(localStorage.getItem('orders') || '[]');
+      const params   = new URLSearchParams(window.location.search);
+      const fromCart = JSON.parse(localStorage.getItem('cart') || '[]').length > 0;
+      const customer = document.getElementById('first-name').value + ' ' + document.getElementById('last-name').value;
+      const email    = document.getElementById('email').value;
+      const date     = new Date().toLocaleDateString();
+      const newOrders = [];
 
       if (fromCart) {
         const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        let grandTotal = 0;
-
         cart.forEach(item => {
-          // Deduct stock per item
           const key = 'stock__' + item.name + '__' + item.color;
           const cur = localStorage.getItem(key);
           if (cur !== null) localStorage.setItem(key, Math.max(0, parseInt(cur) - item.qty));
           const lineTotal = item.unitPrice ? (item.unitPrice * item.qty) : 0;
-          grandTotal += lineTotal;
-          orders.unshift({ product: item.name, color: item.color, qty: item.qty, price: item.unitPrice ? '$' + lineTotal.toFixed(2) : '—', name: customer, email, date });
+          newOrders.push({ product: item.name, color: item.color, qty: item.qty, price: item.unitPrice ? '$' + lineTotal.toFixed(2) : '—', name: customer, email, date });
         });
-
-        localStorage.setItem('orders', JSON.stringify(orders));
-        localStorage.removeItem('cart'); // clear cart after order
+        localStorage.removeItem('cart');
       } else {
         const product = decodeURIComponent(params.get('name')  || 'Unknown');
         const color   = decodeURIComponent(params.get('color') || '');
         const qty     = parseInt(params.get('qty') || '1');
-
         if (color) {
           const key = 'stock__' + product + '__' + color;
           const cur = localStorage.getItem(key);
           if (cur !== null) localStorage.setItem(key, Math.max(0, parseInt(cur) - qty));
         }
-
-        orders.unshift({ product, price: decodeURIComponent(params.get('price') || ''), color, qty, name: customer, email, date });
-        localStorage.setItem('orders', JSON.stringify(orders));
+        newOrders.push({ product, price: decodeURIComponent(params.get('price') || ''), color, qty, name: customer, email, date });
       }
 
-      // Send email notification
-      const customer = document.getElementById('first-name').value + ' ' + document.getElementById('last-name').value;
-      const email    = document.getElementById('email').value;
-      const fromCart = new URLSearchParams(window.location.search).get('from') === 'cart';
-      let summary = '';
+      // Save to cloud
+      await saveOrderToCloud(newOrders);
 
-      if (fromCart) {
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        summary = cart.map(i => `• ${i.emoji || ''} ${i.name} | Color: ${i.color || '—'} | Qty: ${i.qty} | $${i.unitPrice ? (i.unitPrice * i.qty).toFixed(2) : '—'}`).join('\n');
-      } else {
-        const p = new URLSearchParams(window.location.search);
-        summary = `• ${decodeURIComponent(p.get('name') || '')} | Color: ${decodeURIComponent(p.get('color') || '—')} | Qty: ${p.get('qty') || 1} | ${decodeURIComponent(p.get('price') || '—')}`;
-      }
-
+      // Email notification
+      const summary = newOrders.map(o => `• ${o.product} | Color: ${o.color || '—'} | Qty: ${o.qty} | ${o.price}`).join('\n');
       emailjs.send('service_me0vzep', 'template_hdm2b18', {
         subject:    '🛒 New Order from ' + customer,
         from_name:  customer,
